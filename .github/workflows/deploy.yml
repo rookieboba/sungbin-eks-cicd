@@ -1,0 +1,36 @@
+name: Deploy to EKS
+
+on:
+  push:
+    branches:
+      - main  # main 브랜치로 push될 때 실행
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Authenticate to AWS
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-region: ap-northeast-2
+        role-to-assume: arn:aws:iam::544264220406:role/GitHubActionsEKS  # IAM Role 설정
+
+    - name: Login to Amazon ECR
+      run: |
+        aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin 544264220406.dkr.ecr.ap-northeast-2.amazonaws.com
+
+    - name: Build and Push Docker Image
+      env:
+        ECR_REPOSITORY: sungbin-app
+      run: |
+        docker build -t $ECR_REPOSITORY:latest .
+        docker tag $ECR_REPOSITORY:latest 544264220406.dkr.ecr.ap-northeast-2.amazonaws.com/$ECR_REPOSITORY:latest
+        docker push 544264220406.dkr.ecr.ap-northeast-2.amazonaws.com/$ECR_REPOSITORY:latest
+
+    - name: Deploy to ArgoCD
+      run: |
+        argocd app sync sungbin-app
